@@ -8,7 +8,6 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import * as SafeArea from "react-native-safe-area-context";
-import * as ScreenOrientation from "expo-screen-orientation";
 import {
   PanGestureHandler,
   PanGestureHandlerGestureEvent,
@@ -23,22 +22,7 @@ function ChatHeads({
   const [windowHeight, setWindowHeight] = React.useState(
     Dimensions.get("window").height
   );
-  const [orientation, setOrientation] = React.useState(
-    ScreenOrientation.Orientation.PORTRAIT_UP
-  );
 
-  React.useEffect(() => {
-    function updateOrientation(
-      event: ScreenOrientation.OrientationChangeEvent
-    ) {
-      setOrientation(event.orientationInfo.orientation);
-    }
-    const subscription =
-      ScreenOrientation.addOrientationChangeListener(updateOrientation);
-    return () => {
-      ScreenOrientation.removeOrientationChangeListener(subscription);
-    };
-  });
   const transX = useSharedValue(0);
   const transY = useSharedValue(0);
   const {
@@ -96,19 +80,17 @@ function ChatHeads({
     onEnd: (event) => {
       const width =
         windowWidthDv.value -
-        // This is hacky and wrong
-        (orientation === ScreenOrientation.Orientation.PORTRAIT_UP
-          ? leftOffsetDv.value + rightOffsetDv.value
-          : topOffsetDv.value + bottomOffsetDv.value) -
+        leftOffsetDv.value -
+        rightOffsetDv.value -
         styles.container.margin * 2 -
-        styles.head.height; // minus margins & width
+        styles.head.width; // minus margins & width
       const height =
         windowHeightDv.value -
-        // This is hacky and wrong
-        (orientation === ScreenOrientation.Orientation.PORTRAIT_UP
-          ? topOffsetDv.value + bottomOffsetDv.value
-          : leftOffsetDv.value + rightOffsetDv.value) -
-        styles.container.margin * 2;
+        topOffsetDv.value -
+        bottomOffsetDv.value -
+        styles.container.margin * 2 -
+        styles.head.height;
+
       const toss = 0.1;
       function clamp(value: number, min: number, max: number) {
         return Math.min(Math.max(value, min), max);
@@ -179,16 +161,21 @@ function ChatHeads({
 function Main(): React.ReactElement {
   return (
     <SafeArea.SafeAreaProvider>
-      <View style={styles.container}>
-        <ChatHeads>
-          <View style={styles.head} />
-        </ChatHeads>
-      </View>
+      <SafeArea.SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <ChatHeads>
+            <View style={styles.head} />
+          </ChatHeads>
+        </View>
+      </SafeArea.SafeAreaView>
     </SafeArea.SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     margin: 50,
     flex: 1,
