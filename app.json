@@ -1,5 +1,6 @@
 {
   "expo": {
+    "sdkVersion": "47.0.0",
     "name": "pip-mvp",
     "slug": "pip-mvp",
     "version": "1.0.0",
@@ -13,7 +14,9 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
