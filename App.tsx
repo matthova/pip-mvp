@@ -52,9 +52,6 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
   }, [dimensions, dimensionsPrev, start, transX, transY]);
 
   const panGesture = Gesture.Pan()
-    .onStart((e) => {
-      console.log("start", start.value);
-    })
     .onUpdate((event) => {
       transX.value = start.value.x + event.translationX;
       transY.value = start.value.y + event.translationY;
@@ -63,7 +60,7 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
       if (dimensionsDv.value == null) {
         return;
       }
-      const toss = 0.1;
+      const toss = 0.15;
       function clamp(value: number, min: number, max: number) {
         return Math.min(Math.max(value, min), max);
       }
