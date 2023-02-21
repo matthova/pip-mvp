@@ -5,6 +5,9 @@ import Animated, {
   useDerivedValue,
   useAnimatedStyle,
   withSpring,
+  withSequence,
+  withTiming,
+  withDelay,
 } from "react-native-reanimated";
 import usePrevious from "react-use/esm/usePrevious";
 import * as SafeArea from "react-native-safe-area-context";
@@ -21,6 +24,9 @@ function ChatHeads() {
   const [dimensions, setDimensions] = React.useState<LayoutRectangle | null>(
     null
   );
+  const marginTop = useSharedValue(styles.container.margin);
+  const marginBottom = useSharedValue(styles.container.margin);
+
   const dimensionsDv = useDerivedValue(() => dimensions, [dimensions]);
   const dimensionsPrev = usePrevious(dimensions);
 
@@ -37,14 +43,8 @@ function ChatHeads() {
     const newHeight = dimensions.height - styles.head.height;
     const newY = (start.value.y / oldHeight) * newHeight;
 
-    transX.value = withSpring(newX, {
-      damping: 200,
-      stiffness: 200,
-    });
-    transY.value = withSpring(newY, {
-      damping: 200,
-      stiffness: 200,
-    });
+    transX.value = newX;
+    transY.value = newY;
     start.value = { x: newX, y: newY };
   }, [dimensions, dimensionsPrev, start, transX, transY]);
 
@@ -109,7 +109,16 @@ function ChatHeads() {
     });
 
   const tapGesture = Gesture.Tap().onEnd(() => {
-    console.log("nice!");
+    marginTop.value = withSequence(
+      withTiming(marginTop.value),
+      withTiming(100, { duration: 300 }),
+      withDelay(3000, withTiming(styles.container.margin, { duration: 300 }))
+    );
+    marginBottom.value = withSequence(
+      withTiming(marginBottom.value),
+      withTiming(100, { duration: 300 }),
+      withDelay(3000, withTiming(styles.container.margin, { duration: 300 }))
+    );
   });
 
   const gesture = Gesture.Race(panGesture, tapGesture);
@@ -127,10 +136,20 @@ function ChatHeads() {
     };
   });
 
+  const containerStyles = useAnimatedStyle(() => {
+    return {
+      marginTop: marginTop.value,
+      marginBottom: marginBottom.value,
+    };
+  });
+
   return (
     <Animated.View
-      style={styles.container}
-      onLayout={(e) => setDimensions(e.nativeEvent.layout)}
+      style={[styles.container, containerStyles]}
+      onLayout={(e) => {
+        console.log("e dang");
+        setDimensions(e.nativeEvent.layout);
+      }}
     >
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.headContainer, stylez]}>
