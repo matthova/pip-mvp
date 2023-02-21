@@ -4,15 +4,11 @@ import Animated, {
   useSharedValue,
   useDerivedValue,
   useAnimatedStyle,
-  useAnimatedGestureHandler,
   withSpring,
 } from "react-native-reanimated";
 import usePrevious from "react-use/esm/usePrevious";
 import * as SafeArea from "react-native-safe-area-context";
-import {
-  PanGestureHandler,
-  PanGestureHandlerGestureEvent,
-} from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as ScreenOrientation from "expo-screen-orientation";
 
 function ChatHeads() {
@@ -21,19 +17,12 @@ function ChatHeads() {
   }, []);
   const transX = useSharedValue(0);
   const transY = useSharedValue(0);
-  const transXDestination = useSharedValue(0);
-  const transYDestination = useSharedValue(0);
+  const start = useSharedValue({ x: 0, y: 0 });
   const [dimensions, setDimensions] = React.useState<LayoutRectangle | null>(
     null
   );
   const dimensionsDv = useDerivedValue(() => dimensions, [dimensions]);
   const dimensionsPrev = usePrevious(dimensions);
-  console.log("dimensions", dimensions);
-
-  type AnimatedGHContext = {
-    startX: number;
-    startY: number;
-  };
 
   React.useEffect(() => {
     if (dimensions == null || dimensionsPrev == null) {
@@ -42,46 +31,32 @@ function ChatHeads() {
 
     const oldWidth = dimensionsPrev.width - styles.head.width;
     const newWidth = dimensions.width - styles.head.width;
-    const newX = (transXDestination.value / oldWidth) * newWidth;
+    const newX = (start.value.x / oldWidth) * newWidth;
 
     const oldHeight = dimensionsPrev.height - styles.head.height;
     const newHeight = dimensions.height - styles.head.height;
-    const newY = (transYDestination.value / oldHeight) * newHeight;
+    const newY = (start.value.y / oldHeight) * newHeight;
 
     transX.value = withSpring(newX, {
       damping: 200,
       stiffness: 200,
     });
-    transXDestination.value = newX;
     transY.value = withSpring(newY, {
       damping: 200,
       stiffness: 200,
     });
-    transYDestination.value = newY;
-  }, [
-    dimensions,
-    dimensionsPrev,
-    transX,
-    transXDestination,
-    transY,
-    transYDestination,
-  ]);
+    start.value = { x: newX, y: newY };
+  }, [dimensions, dimensionsPrev, start, transX, transY]);
 
-  const gestureHandler = useAnimatedGestureHandler<
-    PanGestureHandlerGestureEvent,
-    AnimatedGHContext
-  >({
-    onStart: (_, ctx) => {
-      ctx.startX = transXDestination.value;
-      ctx.startY = transYDestination.value;
-    },
-    onActive: (event, ctx) => {
-      transX.value = ctx.startX + event.translationX;
-      transXDestination.value = transX.value;
-      transY.value = ctx.startY + event.translationY;
-      transYDestination.value = transY.value;
-    },
-    onEnd: (event) => {
+  const panGesture = Gesture.Pan()
+    .onStart((e) => {
+      console.log("start", start.value);
+    })
+    .onUpdate((event) => {
+      transX.value = start.value.x + event.translationX;
+      transY.value = start.value.y + event.translationY;
+    })
+    .onEnd((event) => {
       if (dimensionsDv.value == null) {
         return;
       }
@@ -125,15 +100,19 @@ function ChatHeads() {
         damping: 40,
         stiffness: 90,
       });
-      transXDestination.value = snapX;
       transY.value = withSpring(snapY, {
         velocity: event.velocityY,
         damping: 40,
         stiffness: 90,
       });
-      transYDestination.value = snapY;
-    },
+      start.value = { x: snapX, y: snapY };
+    });
+
+  const tapGesture = Gesture.Tap().onEnd(() => {
+    console.log("nice!");
   });
+
+  const gesture = Gesture.Race(panGesture, tapGesture);
 
   const stylez = useAnimatedStyle(() => {
     return {
@@ -149,16 +128,16 @@ function ChatHeads() {
   });
 
   return (
-    <View
+    <Animated.View
       style={styles.container}
       onLayout={(e) => setDimensions(e.nativeEvent.layout)}
     >
-      <PanGestureHandler onGestureEvent={gestureHandler}>
+      <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.headContainer, stylez]}>
           <View style={styles.head} />
         </Animated.View>
-      </PanGestureHandler>
-    </View>
+      </GestureDetector>
+    </Animated.View>
   );
 }
 
