@@ -14,7 +14,10 @@ import * as SafeArea from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as ScreenOrientation from "expo-screen-orientation";
 
-function ChatHeads() {
+interface PipAndContainerProps {
+  snapToCorners?: boolean;
+}
+function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
   React.useEffect(() => {
     ScreenOrientation.unlockAsync();
   }, []);
@@ -80,19 +83,27 @@ function ChatHeads() {
       switch (minDistance) {
         case top:
           snapY = 0;
-          snapX = left < right ? 0 : width;
+          if (snapToCorners) {
+            snapX = left < right ? 0 : width;
+          }
           break;
         case bottom:
           snapY = height;
-          snapX = left < right ? 0 : width;
+          if (snapToCorners) {
+            snapX = left < right ? 0 : width;
+          }
           break;
         case left:
           snapX = 0;
-          snapY = top < bottom ? 0 : height;
+          if (snapToCorners) {
+            snapY = top < bottom ? 0 : height;
+          }
           break;
         case right:
           snapX = width;
-          snapY = top < bottom ? 0 : height;
+          if (snapToCorners) {
+            snapY = top < bottom ? 0 : height;
+          }
           break;
       }
       transX.value = withSpring(snapX, {
@@ -112,12 +123,12 @@ function ChatHeads() {
     marginTop.value = withSequence(
       withTiming(marginTop.value),
       withTiming(100, { duration: 300 }),
-      withDelay(3000, withTiming(styles.container.margin, { duration: 300 }))
+      withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
     );
     marginBottom.value = withSequence(
       withTiming(marginBottom.value),
       withTiming(100, { duration: 300 }),
-      withDelay(3000, withTiming(styles.container.margin, { duration: 300 }))
+      withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
     );
   });
 
@@ -163,7 +174,7 @@ function ChatHeads() {
 function Main(): React.ReactElement {
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <ChatHeads />
+      <PipAndContainer />
     </SafeArea.SafeAreaView>
   );
 }
@@ -171,12 +182,12 @@ function Main(): React.ReactElement {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#DDDDFF",
+    backgroundColor: "#8888FF",
   },
   container: {
     margin: 50,
     flex: 1,
-    backgroundColor: "#FFDDDD",
+    backgroundColor: "#FF8888",
   },
   head: {
     width: 80,
