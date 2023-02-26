@@ -169,16 +169,15 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         withTiming(100, { duration: 300 }),
         withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
       );
-      const initialY = transY.value;
       transY.value = withSequence(
-        withTiming(initialY),
+        withTiming(transY.value),
         withTiming(
           transY.value *
           ((windowHeightDv.value - marginBottom.value - marginTop.value) /
             windowHeightDv.value),
           { duration: 300 }
         ),
-        withDelay(1000, withTiming(initialY, { duration: 300 }))
+        withDelay(1000, withTiming(transY.value, { duration: 300 }))
       );
     })
     .runOnJS(true);
