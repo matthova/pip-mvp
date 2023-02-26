@@ -1,0 +1,74 @@
+[
+    {
+        "dimensions": {
+            "height": 628,
+            "width": 275,
+            "x": 50,
+            "y": 100
+        },
+        "dimensionsPrev": {
+            "height": 628,
+            "width": 275,
+            "x": 50,
+            "y": 100
+        },
+        "newHeight": 548,
+        "newWidth": 195,
+        "newX": 195,
+        "newY": 548,
+        "oldHeight": 548,
+        "oldWidth": 195,
+        "start": {
+            "x": 195,
+            "y": 548
+        }
+    },
+    {
+        "dimensions": {
+            "height": 254,
+            "width": 662,
+            "x": 100,
+            "y": 50
+        },
+        "dimensionsPrev": {
+            "height": 191,
+            "width": 712,
+            "x": 50,
+            "y": 100
+        },
+        "newHeight": 174,
+        "newWidth": 582,
+        "newX": 179.57278481012656,
+        "newY": 859.0270270270271,
+        "oldHeight": 111,
+        "oldWidth": 632,
+        "start": {
+            "x": 195,
+            "y": 548
+        }
+    },
+    {
+        "dimensions": {
+            "height": 275,
+            "width": 712,
+            "x": 50,
+            "y": 50
+        },
+        "dimensionsPrev": {
+            "height": 254,
+            "width": 662,
+            "x": 100,
+            "y": 50
+        },
+        "newHeight": 195,
+        "newWidth": 632,
+        "newX": 195,
+        "newY": 962.7027027027027,
+        "oldHeight": 174,
+        "oldWidth": 582,
+        "start": {
+            "x": 179.57278481012656,
+            "y": 859.0270270270271
+        }
+    }
+]
