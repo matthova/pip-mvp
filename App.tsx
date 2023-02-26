@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, LayoutRectangle } from "react-native";
+import { Dimensions, View, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,50 +14,108 @@ import Animated, {
 import * as SafeArea from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as ScreenOrientation from "expo-screen-orientation";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import usePrevious from "react-use/esm/usePrevious";
 
 const spring: WithSpringConfig = {
   damping: 100,
-  stiffness: 400,
+  stiffness: 300,
 };
 interface PipAndContainerProps {
+  orientation: ScreenOrientation.Orientation;
   snapToCorners?: boolean;
 }
-function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
-  React.useEffect(() => {
-    ScreenOrientation.unlockAsync();
-  }, []);
+function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
+  const {
+    top: offsetTop,
+    bottom: offsetBottom,
+    left: offsetLeft,
+    right: offsetRight,
+  } = useSafeAreaInsets();
+
   const [start, setStart] = React.useState({ x: 0, y: 0 });
   const startDv = useDerivedValue(() => start, [start]);
-  const transX = useSharedValue(start.x);
-  const transY = useSharedValue(start.y);
-  const dimensions = useSharedValue<LayoutRectangle | null>(null);
-  const dimensionsPrev = useSharedValue<LayoutRectangle | null>(null);
+
   const marginTop = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
+  const transX = useSharedValue(start.x);
+  const transY = useSharedValue(start.y);
+
+  const { width, height } = Dimensions.get("window");
+  const windowWidth =
+    width -
+    offsetLeft -
+    offsetRight -
+    styles.container.margin * 2 -
+    styles.head.width;
+  const windowWidthPrev = usePrevious(windowWidth);
+  const windowWidthDv = useDerivedValue(() => windowWidth, [windowWidth]);
+
+  const windowHeight =
+    height -
+    offsetTop -
+    offsetBottom -
+    marginTop.value -
+    marginBottom.value -
+    styles.head.height;
+
+  const windowHeightPrev = usePrevious(windowHeight);
+  const windowHeightDv = useDerivedValue(() => windowHeight, [windowHeight]);
+
+  React.useEffect(() => {
+    if (windowWidthPrev === undefined || windowHeightPrev === undefined) {
+      return;
+    }
+    const newX = start.x * (windowWidth / windowWidthPrev);
+    const newY = start.y * (windowHeight / windowHeightPrev);
+    transX.value = newX;
+    transY.value = newY;
+    const newState = { x: newX, y: newY };
+    if (newState.x !== start.x || newState.y !== start.y) {
+      setStart(newState);
+    }
+  }, [
+    start,
+    transX,
+    transY,
+    windowHeight,
+    windowHeightPrev,
+    windowWidth,
+    windowWidthPrev,
+    orientation,
+  ]);
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
-      transX.value = startDv.value.x + event.translationX;
-      transY.value = startDv.value.y + event.translationY;
+      try {
+        transX.value = startDv.value.x + event.translationX;
+        transY.value = startDv.value.y + event.translationY;
+      } catch (ex) {
+        // startDv may temporarily become undefined with fast refresh
+      }
     })
     .onEnd((event) => {
-      if (dimensions.value == null) {
-        return;
-      }
       const toss = 0.15;
       function clamp(value: number, min: number, max: number) {
         return Math.min(Math.max(value, min), max);
       }
-      const width = dimensions.value.width - styles.head.width;
-      const targetX = clamp(transX.value + toss * event.velocityX, 0, width);
+      const targetX = clamp(
+        transX.value + toss * event.velocityX,
+        0,
+        windowWidthDv.value
+      );
 
-      const height = dimensions.value.height - styles.head.height;
-      const targetY = clamp(transY.value + toss * event.velocityY, 0, height);
+      const targetY = clamp(
+        transY.value + toss * event.velocityY,
+        0,
+        windowHeightDv.value
+      );
 
       const top = targetY;
-      const bottom = height - targetY;
+      const bottom = windowHeightDv.value - targetY;
       const left = targetX;
-      const right = width - targetX;
+      const right = windowWidthDv.value - targetX;
+
       const minDistance = Math.min(top, bottom, left, right);
       let snapX = targetX;
       let snapY = targetY;
@@ -65,25 +123,25 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
         case top:
           snapY = 0;
           if (snapToCorners) {
-            snapX = left < right ? 0 : width;
+            snapX = left < right ? 0 : windowWidthDv.value;
           }
           break;
         case bottom:
-          snapY = height;
+          snapY = windowHeightDv.value;
           if (snapToCorners) {
-            snapX = left < right ? 0 : width;
+            snapX = left < right ? 0 : windowWidthDv.value;
           }
           break;
         case left:
           snapX = 0;
           if (snapToCorners) {
-            snapY = top < bottom ? 0 : height;
+            snapY = top < bottom ? 0 : windowHeightDv.value;
           }
           break;
         case right:
-          snapX = width;
+          snapX = windowWidthDv.value;
           if (snapToCorners) {
-            snapY = top < bottom ? 0 : height;
+            snapY = top < bottom ? 0 : windowHeightDv.value;
           }
           break;
       }
@@ -96,20 +154,34 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
         velocity: event.velocityY,
       });
       runOnJS(setStart)({ x: snapX, y: snapY });
-    });
+    })
+    .runOnJS(true); // fixes fast refresh bugs
 
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    marginTop.value = withSequence(
-      withTiming(marginTop.value),
-      withTiming(100, { duration: 300 }),
-      withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
-    );
-    marginBottom.value = withSequence(
-      withTiming(marginBottom.value),
-      withTiming(100, { duration: 300 }),
-      withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
-    );
-  });
+  const tapGesture = Gesture.Tap()
+    .onEnd(() => {
+      marginTop.value = withSequence(
+        withTiming(marginTop.value),
+        withTiming(100, { duration: 300 }),
+        withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
+      );
+      marginBottom.value = withSequence(
+        withTiming(marginBottom.value),
+        withTiming(100, { duration: 300 }),
+        withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
+      );
+      const initialY = transY.value;
+      transY.value = withSequence(
+        withTiming(initialY),
+        withTiming(
+          transY.value *
+          ((windowHeightDv.value - marginBottom.value - marginTop.value) /
+            windowHeightDv.value),
+          { duration: 300 }
+        ),
+        withDelay(1000, withTiming(initialY, { duration: 300 }))
+      );
+    })
+    .runOnJS(true);
 
   const gesture = Gesture.Race(panGesture, tapGesture);
 
@@ -134,25 +206,7 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
   });
 
   return (
-    <Animated.View
-      style={[styles.container, containerStyles]}
-      onLayout={(e) => {
-        dimensionsPrev.value = dimensions.value;
-        dimensions.value = e.nativeEvent.layout;
-        if (dimensionsPrev.value == null) {
-          return;
-        }
-        const oldWidth = dimensionsPrev.value.width - styles.head.width;
-        const newWidth = dimensions.value.width - styles.head.width;
-        const newX = start.x * (newWidth / oldWidth);
-        const oldHeight = dimensionsPrev.value.height - styles.head.height;
-        const newHeight = dimensions.value.height - styles.head.height;
-        const newY = start.y * (newHeight / oldHeight);
-        transX.value = newX;
-        transY.value = newY;
-        setStart({ x: newX, y: newY });
-      }}
-    >
+    <Animated.View style={[styles.container, containerStyles]}>
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.headContainer, stylez]}>
           <View style={styles.head} />
@@ -163,9 +217,25 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
 }
 
 function Main(): React.ReactElement {
+  const [orientation, setOrientation] =
+    React.useState<ScreenOrientation.Orientation>(
+      ScreenOrientation.Orientation.PORTRAIT_UP
+    );
+
+  React.useEffect(() => {
+    const updateSubscription = ScreenOrientation.addOrientationChangeListener(
+      (e) => {
+        setOrientation(e.orientationInfo.orientation);
+      }
+    );
+    return () => {
+      updateSubscription.remove();
+    };
+  }, []);
+
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer snapToCorners />
+      <PipAndContainer orientation={orientation} snapToCorners />
     </SafeArea.SafeAreaView>
   );
 }
