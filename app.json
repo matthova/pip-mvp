@@ -9,34 +9,25 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "updates": {
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/a19c9e00-643d-4c85-a5b3-610542ac26b7"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.matthovadiscord.pipmvp"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      },
-      "package": "com.matthovadiscord.pipmvp"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "runtimeVersion": {
+      "policy": "sdkVersion"
     },
     "extra": {
       "eas": {
-        "projectId": "a19c9e00-643d-4c85-a5b3-610542ac26b7"
+        "projectId": "2d1ecc70-0241-42ba-9260-1e4679307337"
       }
     },
-    "runtimeVersion": {
-      "policy": "sdkVersion"
+    "updates": {
+      "url": "https://u.expo.dev/2d1ecc70-0241-42ba-9260-1e4679307337"
+    },
+    "android": {
+      "package": "com.matthova.pipmvp"
+    },
+    "ios": {
+      "bundleIdentifier": "com.matthova.pipmvp"
     }
   }
 }
