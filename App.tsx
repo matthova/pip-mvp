@@ -94,8 +94,8 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
         transY.value =
           destY.value +
           event.translationY *
-          ((screenHeightDv.value - styles.container.margin * 2) /
-            windowHeight.value);
+            ((screenHeightDv.value - styles.container.margin * 2) /
+              windowHeight.value);
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
       }
