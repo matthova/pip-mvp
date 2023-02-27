@@ -10,6 +10,8 @@ import Animated, {
   withDelay,
   WithSpringConfig,
   runOnJS,
+  cancelAnimation,
+  interpolate,
 } from "react-native-reanimated";
 import * as SafeArea from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -26,6 +28,7 @@ interface PipAndContainerProps {
   snapToCorners?: boolean;
 }
 function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
+  const { width, height } = Dimensions.get("window");
   const {
     top: offsetTop,
     bottom: offsetBottom,
@@ -33,63 +36,54 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
     right: offsetRight,
   } = useSafeAreaInsets();
 
-  const [start, setStart] = React.useState({ x: 0, y: 0 });
-  const startDv = useDerivedValue(() => start, [start]);
-
   const marginTop = useSharedValue(styles.container.margin);
+  const marginTopDestination = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
-  const transX = useSharedValue(start.x);
-  const transY = useSharedValue(start.y);
+  const marginBottomDestination = useSharedValue(styles.container.margin);
+  const destX = useSharedValue(0);
+  const destY = useSharedValue(0);
+  const transX = useSharedValue(destX.value);
+  const transY = useSharedValue(destY.value);
 
-  const { width, height } = Dimensions.get("window");
-  const windowWidth =
+  const windowWidthDestination = useSharedValue(
     width -
     offsetLeft -
     offsetRight -
     styles.container.margin * 2 -
-    styles.head.width;
-  const windowWidthPrev = usePrevious(windowWidth);
-  const windowWidthDv = useDerivedValue(() => windowWidth, [windowWidth]);
+    styles.head.width
+  );
+  const windowWidth = useDerivedValue(
+    () => windowWidthDestination.value,
+    [windowWidthDestination]
+  );
 
-  const windowHeight =
-    height -
-    offsetTop -
-    offsetBottom -
-    marginTop.value -
-    marginBottom.value -
-    styles.head.height;
+  const windowHeight = useDerivedValue(
+    () =>
+      height -
+      offsetTop -
+      offsetBottom -
+      marginTop.value -
+      marginBottom.value -
+      styles.head.height,
+    [height, offsetTop, offsetBottom, marginTop, marginBottom, styles]
+  );
 
-  const windowHeightPrev = usePrevious(windowHeight);
-  const windowHeightDv = useDerivedValue(() => windowHeight, [windowHeight]);
-
-  React.useEffect(() => {
-    if (windowWidthPrev === undefined || windowHeightPrev === undefined) {
-      return;
-    }
-    const newX = start.x * (windowWidth / windowWidthPrev);
-    const newY = start.y * (windowHeight / windowHeightPrev);
-    transX.value = newX;
-    transY.value = newY;
-    const newState = { x: newX, y: newY };
-    if (newState.x !== start.x || newState.y !== start.y) {
-      setStart(newState);
-    }
-  }, [
-    start,
-    transX,
-    transY,
-    windowHeight,
-    windowHeightPrev,
-    windowWidth,
-    windowWidthPrev,
-    orientation,
-  ]);
+  const windowHeightDestination = useDerivedValue(
+    () =>
+      height -
+      offsetTop -
+      offsetBottom -
+      marginTopDestination.value -
+      marginBottomDestination.value -
+      styles.head.height,
+    [height, offsetTop, offsetBottom, marginTop, marginBottom, styles]
+  );
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       try {
-        transX.value = startDv.value.x + event.translationX;
-        transY.value = startDv.value.y + event.translationY;
+        transX.value = destX.value + event.translationX;
+        transY.value = destY.value + event.translationY;
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
       }
@@ -102,19 +96,20 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
       const targetX = clamp(
         transX.value + toss * event.velocityX,
         0,
-        windowWidthDv.value
+        windowWidth.value
       );
 
+      console.log("clamped", windowHeight.value);
       const targetY = clamp(
         transY.value + toss * event.velocityY,
         0,
-        windowHeightDv.value
+        windowHeight.value
       );
 
       const top = targetY;
-      const bottom = windowHeightDv.value - targetY;
+      const bottom = windowHeight.value - targetY;
       const left = targetX;
-      const right = windowWidthDv.value - targetX;
+      const right = windowWidth.value - targetX;
 
       const minDistance = Math.min(top, bottom, left, right);
       let snapX = targetX;
@@ -123,25 +118,25 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         case top:
           snapY = 0;
           if (snapToCorners) {
-            snapX = left < right ? 0 : windowWidthDv.value;
+            snapX = left < right ? 0 : windowWidth.value;
           }
           break;
         case bottom:
-          snapY = windowHeightDv.value;
+          snapY = windowHeight.value;
           if (snapToCorners) {
-            snapX = left < right ? 0 : windowWidthDv.value;
+            snapX = left < right ? 0 : windowWidth.value;
           }
           break;
         case left:
           snapX = 0;
           if (snapToCorners) {
-            snapY = top < bottom ? 0 : windowHeightDv.value;
+            snapY = top < bottom ? 0 : windowHeight.value;
           }
           break;
         case right:
-          snapX = windowWidthDv.value;
+          snapX = windowWidth.value;
           if (snapToCorners) {
-            snapY = top < bottom ? 0 : windowHeightDv.value;
+            snapY = top < bottom ? 0 : windowHeight.value;
           }
           break;
       }
@@ -149,49 +144,56 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         ...spring,
         velocity: event.velocityX,
       });
+      destX.value = snapX;
       transY.value = withSpring(snapY, {
         ...spring,
         velocity: event.velocityY,
       });
-      runOnJS(setStart)({ x: snapX, y: snapY });
+      destY.value = snapY;
     })
     .runOnJS(true); // fixes fast refresh bugs
 
   const tapGesture = Gesture.Tap()
     .onEnd(() => {
+      const marginTopBump = 50;
+      const marginBottomBump = 100;
       marginTop.value = withSequence(
-        withTiming(marginTop.value),
-        withTiming(100, { duration: 300 }),
-        withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
+        withTiming(styles.container.margin),
+        withTiming(styles.container.margin + marginTopBump, { duration: 300 }),
+        withDelay(2000, withTiming(styles.container.margin, { duration: 300 }))
       );
+      marginTopDestination.value = withDelay(
+        2000,
+        withTiming(styles.container.margin, { duration: 0 })
+      );
+
       marginBottom.value = withSequence(
-        withTiming(marginBottom.value),
-        withTiming(100, { duration: 300 }),
-        withDelay(1000, withTiming(styles.container.margin, { duration: 300 }))
+        withTiming(styles.container.margin),
+        withTiming(styles.container.margin + marginBottomBump, {
+          duration: 300,
+        }),
+        withDelay(2000, withTiming(styles.container.margin, { duration: 300 }))
       );
-      transY.value = withSequence(
-        withTiming(transY.value),
-        withTiming(
-          transY.value *
-          ((windowHeightDv.value - marginBottom.value - marginTop.value) /
-            windowHeightDv.value),
-          { duration: 300 }
-        ),
-        withDelay(1000, withTiming(transY.value, { duration: 300 }))
+      marginBottomDestination.value = withDelay(
+        2000,
+        withTiming(styles.container.margin, { duration: 0 })
       );
     })
-    .runOnJS(true);
+    .runOnJS(true); // fixes fast refresh bugs
 
   const gesture = Gesture.Race(panGesture, tapGesture);
 
   const stylez = useAnimatedStyle(() => {
+    const translateY =
+      transY.value * (windowHeight.value / windowHeightDestination.value);
+    console.log("translateY", translateY, transY.value);
     return {
       transform: [
         {
           translateX: transX.value,
         },
         {
-          translateY: transY.value,
+          translateY,
         },
       ],
     };
@@ -234,7 +236,7 @@ function Main(): React.ReactElement {
 
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer orientation={orientation} snapToCorners />
+      <PipAndContainer orientation={orientation} />
     </SafeArea.SafeAreaView>
   );
 }
