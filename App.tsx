@@ -37,24 +37,23 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
   } = useSafeAreaInsets();
 
   const marginTop = useSharedValue(styles.container.margin);
-  const marginTopDestination = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
-  const marginBottomDestination = useSharedValue(styles.container.margin);
   const destX = useSharedValue(0);
-  const destY = useSharedValue(0);
   const transX = useSharedValue(destX.value);
+  const destY = useSharedValue(0);
   const transY = useSharedValue(destY.value);
 
-  const windowWidthDestination = useSharedValue(
+  const windowWidth = useSharedValue(
     width -
     offsetLeft -
     offsetRight -
     styles.container.margin * 2 -
     styles.head.width
   );
-  const windowWidth = useDerivedValue(
-    () => windowWidthDestination.value,
-    [windowWidthDestination]
+
+  const screenHeight = useDerivedValue(
+    () => height - offsetTop - offsetBottom - styles.head.height,
+    [height, offsetTop, offsetBottom, styles]
   );
 
   const windowHeight = useDerivedValue(
@@ -68,22 +67,15 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
     [height, offsetTop, offsetBottom, marginTop, marginBottom, styles]
   );
 
-  const windowHeightDestination = useDerivedValue(
-    () =>
-      height -
-      offsetTop -
-      offsetBottom -
-      marginTopDestination.value -
-      marginBottomDestination.value -
-      styles.head.height,
-    [height, offsetTop, offsetBottom, marginTop, marginBottom, styles]
-  );
-
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       try {
         transX.value = destX.value + event.translationX;
-        transY.value = destY.value + event.translationY;
+        transY.value =
+          destY.value +
+          event.translationY -
+          marginBottom.value +
+          marginTop.value;
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
       }
@@ -99,12 +91,12 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         windowWidth.value
       );
 
-      console.log("clamped", windowHeight.value);
-      const targetY = clamp(
-        transY.value + toss * event.velocityY,
-        0,
-        windowHeight.value
-      );
+      const tossY = transY.value + toss * event.velocityY;
+      const min = marginTop.value - styles.container.margin;
+      const yDiff =
+        marginTop.value + marginBottom.value - styles.container.margin * 2;
+      const max = windowHeight.value + yDiff;
+      const targetY = clamp(tossY, min, max);
 
       const top = targetY;
       const bottom = windowHeight.value - targetY;
@@ -113,7 +105,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
 
       const minDistance = Math.min(top, bottom, left, right);
       let snapX = targetX;
-      let snapY = targetY;
+      let snapY = targetY - marginTop.value + styles.container.margin;
       switch (minDistance) {
         case top:
           snapY = 0;
@@ -122,7 +114,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
           }
           break;
         case bottom:
-          snapY = windowHeight.value;
+          snapY = windowHeight.value + yDiff;
           if (snapToCorners) {
             snapX = left < right ? 0 : windowWidth.value;
           }
@@ -130,16 +122,17 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         case left:
           snapX = 0;
           if (snapToCorners) {
-            snapY = top < bottom ? 0 : windowHeight.value;
+            snapY = top < bottom ? 0 : windowHeight.value + yDiff;
           }
           break;
         case right:
           snapX = windowWidth.value;
           if (snapToCorners) {
-            snapY = top < bottom ? 0 : windowHeight.value;
+            snapY = top < bottom ? 0 : windowHeight.value + yDiff;
           }
           break;
       }
+
       transX.value = withSpring(snapX, {
         ...spring,
         velocity: event.velocityX,
@@ -157,14 +150,14 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
     .onEnd(() => {
       const marginTopBump = 50;
       const marginBottomBump = 100;
+      const tapDelayMs = 2000;
       marginTop.value = withSequence(
         withTiming(styles.container.margin),
         withTiming(styles.container.margin + marginTopBump, { duration: 300 }),
-        withDelay(2000, withTiming(styles.container.margin, { duration: 300 }))
-      );
-      marginTopDestination.value = withDelay(
-        2000,
-        withTiming(styles.container.margin, { duration: 0 })
+        withDelay(
+          tapDelayMs,
+          withTiming(styles.container.margin, { duration: 300 })
+        )
       );
 
       marginBottom.value = withSequence(
@@ -172,11 +165,10 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         withTiming(styles.container.margin + marginBottomBump, {
           duration: 300,
         }),
-        withDelay(2000, withTiming(styles.container.margin, { duration: 300 }))
-      );
-      marginBottomDestination.value = withDelay(
-        2000,
-        withTiming(styles.container.margin, { duration: 0 })
+        withDelay(
+          tapDelayMs,
+          withTiming(styles.container.margin, { duration: 300 })
+        )
       );
     })
     .runOnJS(true); // fixes fast refresh bugs
@@ -184,16 +176,16 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
   const gesture = Gesture.Race(panGesture, tapGesture);
 
   const stylez = useAnimatedStyle(() => {
-    const translateY =
-      transY.value * (windowHeight.value / windowHeightDestination.value);
-    console.log("translateY", translateY, transY.value);
     return {
       transform: [
         {
           translateX: transX.value,
         },
         {
-          translateY,
+          translateY:
+            transY.value *
+            (windowHeight.value /
+              (screenHeight.value - styles.container.margin * 2)),
         },
       ],
     };
