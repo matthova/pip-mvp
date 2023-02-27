@@ -9,9 +9,6 @@ import Animated, {
   withTiming,
   withDelay,
   WithSpringConfig,
-  runOnJS,
-  cancelAnimation,
-  interpolate,
 } from "react-native-reanimated";
 import * as SafeArea from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -24,10 +21,9 @@ const spring: WithSpringConfig = {
   stiffness: 300,
 };
 interface PipAndContainerProps {
-  orientation: ScreenOrientation.Orientation;
   snapToCorners?: boolean;
 }
-function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
+function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
   const { width, height } = Dimensions.get("window");
   const {
     top: offsetTop,
@@ -43,18 +39,18 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
   const destY = useSharedValue(0);
   const transY = useSharedValue(destY.value);
 
-  const windowWidth = useSharedValue(
+  const windowWidth =
     width -
     offsetLeft -
     offsetRight -
     styles.container.margin * 2 -
-    styles.head.width
-  );
+    styles.head.width;
+  const windowWidthPrev = usePrevious(windowWidth);
+  const windowWidthDv = useDerivedValue(() => windowWidth, [windowWidth]);
 
-  const screenHeight = useDerivedValue(
-    () => height - offsetTop - offsetBottom - styles.head.height,
-    [height, offsetTop, offsetBottom, styles]
-  );
+  const screenHeight = height - offsetTop - offsetBottom - styles.head.height;
+  const screenHeightPrev = usePrevious(screenHeight);
+  const screenHeightDv = useDerivedValue(() => screenHeight, [screenHeight]);
 
   const windowHeight = useDerivedValue(
     () =>
@@ -67,6 +63,30 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
     [height, offsetTop, offsetBottom, marginTop, marginBottom, styles]
   );
 
+  React.useEffect(() => {
+    if (windowWidthPrev === undefined || screenHeightPrev === undefined) {
+      return;
+    }
+    const newX = (transX.value / windowWidthPrev) * windowWidth;
+    transX.value = newX;
+    destX.value = newX;
+
+    const newY =
+      (transY.value / (screenHeightPrev - styles.container.margin * 2)) *
+      (screenHeight - styles.container.margin * 2);
+    transY.value = newY;
+    destY.value = newY;
+  }, [
+    destX,
+    destY,
+    screenHeight,
+    screenHeightPrev,
+    transX,
+    transY,
+    windowWidth,
+    windowWidthPrev,
+  ]);
+
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       try {
@@ -74,7 +94,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         transY.value =
           destY.value +
           event.translationY *
-          ((screenHeight.value - styles.container.margin * 2) /
+          ((screenHeightDv.value - styles.container.margin * 2) /
             windowHeight.value);
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
@@ -88,7 +108,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
       const targetX = clamp(
         transX.value + toss * event.velocityX,
         0,
-        windowWidth.value
+        windowWidthDv.value
       );
 
       const tossY = transY.value + toss * event.velocityY;
@@ -101,7 +121,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
       const top = targetY;
       const bottom = windowHeight.value + yDiff - targetY;
       const left = targetX;
-      const right = windowWidth.value - targetX;
+      const right = windowWidthDv.value - targetX;
 
       const minDistance = Math.min(top, bottom, left, right);
       let snapX = targetX;
@@ -110,13 +130,13 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
         case top:
           snapY = 0;
           if (snapToCorners) {
-            snapX = left < right ? 0 : windowWidth.value;
+            snapX = left < right ? 0 : windowWidthDv.value;
           }
           break;
         case bottom:
           snapY = bottom + targetY;
           if (snapToCorners) {
-            snapX = left < right ? 0 : windowWidth.value;
+            snapX = left < right ? 0 : windowWidthDv.value;
           }
           break;
         case left:
@@ -126,7 +146,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
           }
           break;
         case right:
-          snapX = windowWidth.value;
+          snapX = windowWidthDv.value;
           if (snapToCorners) {
             snapY = top < bottom ? 0 : windowHeight.value + yDiff;
           }
@@ -185,7 +205,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
           translateY:
             transY.value *
             (windowHeight.value /
-              (screenHeight.value - styles.container.margin * 2)),
+              (screenHeightDv.value - styles.container.margin * 2)),
         },
       ],
     };
@@ -210,25 +230,9 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
 }
 
 function Main(): React.ReactElement {
-  const [orientation, setOrientation] =
-    React.useState<ScreenOrientation.Orientation>(
-      ScreenOrientation.Orientation.PORTRAIT_UP
-    );
-
-  React.useEffect(() => {
-    const updateSubscription = ScreenOrientation.addOrientationChangeListener(
-      (e) => {
-        setOrientation(e.orientationInfo.orientation);
-      }
-    );
-    return () => {
-      updateSubscription.remove();
-    };
-  }, []);
-
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer orientation={orientation} />
+      <PipAndContainer />
     </SafeArea.SafeAreaView>
   );
 }
