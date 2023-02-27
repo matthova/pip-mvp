@@ -232,7 +232,7 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
 function Main(): React.ReactElement {
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer />
+      <PipAndContainer snapToCorners />
     </SafeArea.SafeAreaView>
   );
 }
