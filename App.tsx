@@ -99,7 +99,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
       const targetY = clamp(tossY, min, max);
 
       const top = targetY;
-      const bottom = windowHeight.value - targetY;
+      const bottom = windowHeight.value + yDiff - targetY;
       const left = targetX;
       const right = windowWidth.value - targetX;
 
@@ -114,7 +114,7 @@ function PipAndContainer({ orientation, snapToCorners }: PipAndContainerProps) {
           }
           break;
         case bottom:
-          snapY = windowHeight.value + yDiff;
+          snapY = bottom + targetY;
           if (snapToCorners) {
             snapX = left < right ? 0 : windowWidth.value;
           }
