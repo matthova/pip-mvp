@@ -1,6 +1,6 @@
 {
   "expo": {
-    "sdkVersion": "47.0.0",
+    "sdkVersion": "48.0.4",
     "name": "pip-mvp",
     "slug": "pip-mvp",
     "version": "1.0.0",
@@ -11,7 +11,8 @@
       "backgroundColor": "#ffffff"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/a19c9e00-643d-4c85-a5b3-610542ac26b7"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -27,6 +28,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a19c9e00-643d-4c85-a5b3-610542ac26b7"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
     }
   }
 }
