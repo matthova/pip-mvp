@@ -9,9 +9,15 @@ import Animated, {
   withTiming,
   withDelay,
   WithSpringConfig,
+  runOnUI,
+  SharedValue,
 } from "react-native-reanimated";
 import * as SafeArea from "react-native-safe-area-context";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import usePrevious from "react-use/esm/usePrevious";
@@ -22,15 +28,22 @@ const spring: WithSpringConfig = {
 };
 interface PipAndContainerProps {
   snapToCorners?: boolean;
+  width: number;
+  height: number;
 }
-function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
-  const { width, height } = Dimensions.get("window");
+
+function PipAndContainer({
+  snapToCorners,
+  width,
+  height,
+}: PipAndContainerProps) {
   const {
     top: offsetTop,
     bottom: offsetBottom,
     left: offsetLeft,
     right: offsetRight,
   } = useSafeAreaInsets();
+  const useEffectQueue = React.useRef<Array<() => void>>([]);
 
   const marginTop = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
@@ -67,15 +80,30 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
     if (windowWidthPrev === undefined || screenHeightPrev === undefined) {
       return;
     }
-    const newX = (transX.value / windowWidthPrev) * windowWidth;
-    transX.value = newX;
-    destX.value = newX;
 
-    const newY =
-      (transY.value / (screenHeightPrev - styles.container.margin * 2)) *
-      (screenHeight - styles.container.margin * 2);
-    transY.value = newY;
-    destY.value = newY;
+    useEffectQueue.current.push(() => {
+      const newX = (transX.value / windowWidthPrev) * windowWidth;
+      const newY =
+        (transY.value / (screenHeightPrev - styles.container.margin * 2)) *
+        (screenHeight - styles.container.margin * 2);
+      transX.value = newX;
+      destX.value = newX;
+      transY.value = newY;
+      destY.value = newY;
+    });
+
+    if (useEffectQueue.current.length === 1) {
+      function loopIt() {
+        if (useEffectQueue.current.length > 0) {
+          setTimeout(() => {
+            const cb = useEffectQueue.current.shift();
+            cb?.();
+            loopIt();
+          }, 10);
+        }
+      }
+      loopIt();
+    }
   }, [
     destX,
     destY,
@@ -94,8 +122,8 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
         transY.value =
           destY.value +
           event.translationY *
-            ((screenHeightDv.value - styles.container.margin * 2) /
-              windowHeight.value);
+          ((screenHeightDv.value - styles.container.margin * 2) /
+            windowHeight.value);
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
       }
@@ -230,9 +258,26 @@ function PipAndContainer({ snapToCorners }: PipAndContainerProps) {
 }
 
 function Main(): React.ReactElement {
+  const [width, setWidth] = React.useState(Dimensions.get("screen").width);
+  const [height, setHeight] = React.useState(Dimensions.get("screen").height);
+
+  React.useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ screen }) => {
+      if (screen.width !== width) {
+        setWidth(screen.width);
+      }
+      if (screen.height !== height) {
+        setHeight(screen.height);
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [height, width]);
+
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer snapToCorners />
+      <PipAndContainer width={width} height={height} />
     </SafeArea.SafeAreaView>
   );
 }
@@ -265,7 +310,9 @@ function Providers() {
 
   return (
     <SafeArea.SafeAreaProvider>
-      <Main />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Main />
+      </GestureHandlerRootView>
     </SafeArea.SafeAreaProvider>
   );
 }
