@@ -21,6 +21,7 @@ import {
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import usePrevious from "react-use/esm/usePrevious";
+import useThrottleFn from "react-use/esm/useThrottleFn";
 
 const spring: WithSpringConfig = {
   damping: 100,
@@ -30,20 +31,29 @@ interface PipAndContainerProps {
   snapToCorners?: boolean;
   width: number;
   height: number;
+  offsetTop: number;
+  offsetBottom: number;
+  offsetLeft: number;
+  offsetRight: number;
 }
 
 function PipAndContainer({
   snapToCorners,
   width,
   height,
+  offsetTop,
+  offsetBottom,
+  offsetLeft,
+  offsetRight,
 }: PipAndContainerProps) {
-  const {
-    top: offsetTop,
-    bottom: offsetBottom,
-    left: offsetLeft,
-    right: offsetRight,
-  } = useSafeAreaInsets();
-
+  console.log("get it!", {
+    width,
+    height,
+    offsetTop,
+    offsetBottom,
+    offsetLeft,
+    offsetRight,
+  });
   const marginTop = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
   const destX = useSharedValue(0);
@@ -105,8 +115,8 @@ function PipAndContainer({
         transY.value =
           destY.value +
           event.translationY *
-          ((screenHeightDv.value - styles.container.margin * 2) /
-            windowHeight.value);
+            ((screenHeightDv.value - styles.container.margin * 2) /
+              windowHeight.value);
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
       }
@@ -243,6 +253,7 @@ function PipAndContainer({
 function Main(): React.ReactElement {
   const [width, setWidth] = React.useState(Dimensions.get("screen").width);
   const [height, setHeight] = React.useState(Dimensions.get("screen").height);
+  const { top, bottom, left, right } = useSafeAreaInsets();
 
   React.useEffect(() => {
     const subscription = Dimensions.addEventListener("change", ({ screen }) => {
@@ -258,9 +269,29 @@ function Main(): React.ReactElement {
     };
   }, [height, width]);
 
+  const throttledValues = useThrottleFn(
+    (width, height, top, bottom, left, right) => ({
+      width,
+      height,
+      top,
+      bottom,
+      left,
+      right,
+    }),
+    10,
+    [width, height, top, bottom, left, right]
+  );
+
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer width={width} height={height} />
+      <PipAndContainer
+        width={throttledValues?.width ?? width}
+        height={throttledValues?.height ?? height}
+        offsetTop={throttledValues?.top ?? top}
+        offsetBottom={throttledValues?.bottom ?? bottom}
+        offsetLeft={throttledValues?.left ?? left}
+        offsetRight={throttledValues?.right ?? right}
+      />
     </SafeArea.SafeAreaView>
   );
 }
