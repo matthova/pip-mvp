@@ -43,7 +43,6 @@ function PipAndContainer({
     left: offsetLeft,
     right: offsetRight,
   } = useSafeAreaInsets();
-  const useEffectQueue = React.useRef<Array<() => void>>([]);
 
   const marginTop = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
@@ -77,33 +76,17 @@ function PipAndContainer({
   );
 
   React.useEffect(() => {
-    if (windowWidthPrev === undefined || screenHeightPrev === undefined) {
-      return;
-    }
+    const newX =
+      (transX.value / (windowWidthPrev ?? windowWidth)) * windowWidth;
+    const newY =
+      (transY.value /
+        ((screenHeightPrev ?? screenHeight) - styles.container.margin * 2)) *
+      (screenHeight - styles.container.margin * 2);
 
-    useEffectQueue.current.push(() => {
-      const newX = (transX.value / windowWidthPrev) * windowWidth;
-      const newY =
-        (transY.value / (screenHeightPrev - styles.container.margin * 2)) *
-        (screenHeight - styles.container.margin * 2);
-      transX.value = newX;
-      destX.value = newX;
-      transY.value = newY;
-      destY.value = newY;
-    });
-
-    if (useEffectQueue.current.length === 1) {
-      function loopIt() {
-        if (useEffectQueue.current.length > 0) {
-          setTimeout(() => {
-            const cb = useEffectQueue.current.shift();
-            cb?.();
-            loopIt();
-          }, 10);
-        }
-      }
-      loopIt();
-    }
+    transX.value = newX;
+    destX.value = newX;
+    transY.value = newY;
+    destY.value = newY;
   }, [
     destX,
     destY,
