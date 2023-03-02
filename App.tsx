@@ -90,7 +90,7 @@ function PipAndContainer({
       if (previous != null && result[0] !== previous[0]) {
         const newY = (result[1] / previous[0]) * result[0];
         transY.value = newY;
-        destX.value = newY;
+        destY.value = newY;
       }
     },
     [screenHeight]
