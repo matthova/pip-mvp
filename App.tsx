@@ -9,8 +9,7 @@ import Animated, {
   withTiming,
   withDelay,
   WithSpringConfig,
-  runOnUI,
-  SharedValue,
+  useAnimatedReaction,
 } from "react-native-reanimated";
 import * as SafeArea from "react-native-safe-area-context";
 import {
@@ -20,8 +19,6 @@ import {
 } from "react-native-gesture-handler";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import usePrevious from "react-use/esm/usePrevious";
-import useThrottleFn from "react-use/esm/useThrottleFn";
 
 const spring: WithSpringConfig = {
   damping: 100,
@@ -31,29 +28,19 @@ interface PipAndContainerProps {
   snapToCorners?: boolean;
   width: number;
   height: number;
-  offsetTop: number;
-  offsetBottom: number;
-  offsetLeft: number;
-  offsetRight: number;
 }
 
 function PipAndContainer({
   snapToCorners,
   width,
   height,
-  offsetTop,
-  offsetBottom,
-  offsetLeft,
-  offsetRight,
 }: PipAndContainerProps) {
-  console.log("get it!", {
-    width,
-    height,
-    offsetTop,
-    offsetBottom,
-    offsetLeft,
-    offsetRight,
-  });
+  const {
+    top: offsetTop,
+    bottom: offsetBottom,
+    left: offsetLeft,
+    right: offsetRight,
+  } = useSafeAreaInsets();
   const marginTop = useSharedValue(styles.container.margin);
   const marginBottom = useSharedValue(styles.container.margin);
   const destX = useSharedValue(0);
@@ -67,11 +54,8 @@ function PipAndContainer({
     offsetRight -
     styles.container.margin * 2 -
     styles.head.width;
-  const windowWidthPrev = usePrevious(windowWidth);
   const windowWidthDv = useDerivedValue(() => windowWidth, [windowWidth]);
-
   const screenHeight = height - offsetTop - offsetBottom - styles.head.height;
-  const screenHeightPrev = usePrevious(screenHeight);
   const screenHeightDv = useDerivedValue(() => screenHeight, [screenHeight]);
 
   const windowHeight = useDerivedValue(
@@ -85,28 +69,32 @@ function PipAndContainer({
     [height, offsetTop, offsetBottom, marginTop, marginBottom, styles]
   );
 
-  React.useEffect(() => {
-    const newX =
-      (transX.value / (windowWidthPrev ?? windowWidth)) * windowWidth;
-    const newY =
-      (transY.value /
-        ((screenHeightPrev ?? screenHeight) - styles.container.margin * 2)) *
-      (screenHeight - styles.container.margin * 2);
-
-    transX.value = newX;
-    destX.value = newX;
-    transY.value = newY;
-    destY.value = newY;
-  }, [
-    destX,
-    destY,
-    screenHeight,
-    screenHeightPrev,
-    transX,
-    transY,
-    windowWidth,
-    windowWidthPrev,
-  ]);
+  useAnimatedReaction(
+    () => {
+      return [windowWidth, transX.value];
+    },
+    (result, previous) => {
+      if (previous != null && result[0] !== previous[0]) {
+        const newX = (result[1] / previous[0]) * result[0];
+        transX.value = newX;
+        destX.value = newX;
+      }
+    },
+    [windowWidth]
+  );
+  useAnimatedReaction(
+    () => {
+      return [screenHeight - styles.container.margin * 2, transY.value];
+    },
+    (result, previous) => {
+      if (previous != null && result[0] !== previous[0]) {
+        const newY = (result[1] / previous[0]) * result[0];
+        transY.value = newY;
+        destX.value = newY;
+      }
+    },
+    [screenHeight]
+  );
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -115,8 +103,8 @@ function PipAndContainer({
         transY.value =
           destY.value +
           event.translationY *
-            ((screenHeightDv.value - styles.container.margin * 2) /
-              windowHeight.value);
+          ((screenHeightDv.value - styles.container.margin * 2) /
+            windowHeight.value);
       } catch (ex) {
         // startDv may temporarily become undefined with fast refresh
       }
@@ -253,7 +241,6 @@ function PipAndContainer({
 function Main(): React.ReactElement {
   const [width, setWidth] = React.useState(Dimensions.get("screen").width);
   const [height, setHeight] = React.useState(Dimensions.get("screen").height);
-  const { top, bottom, left, right } = useSafeAreaInsets();
 
   React.useEffect(() => {
     const subscription = Dimensions.addEventListener("change", ({ screen }) => {
@@ -269,29 +256,9 @@ function Main(): React.ReactElement {
     };
   }, [height, width]);
 
-  const throttledValues = useThrottleFn(
-    (width, height, top, bottom, left, right) => ({
-      width,
-      height,
-      top,
-      bottom,
-      left,
-      right,
-    }),
-    10,
-    [width, height, top, bottom, left, right]
-  );
-
   return (
     <SafeArea.SafeAreaView style={styles.safeArea}>
-      <PipAndContainer
-        width={throttledValues?.width ?? width}
-        height={throttledValues?.height ?? height}
-        offsetTop={throttledValues?.top ?? top}
-        offsetBottom={throttledValues?.bottom ?? bottom}
-        offsetLeft={throttledValues?.left ?? left}
-        offsetRight={throttledValues?.right ?? right}
-      />
+      <PipAndContainer width={width} height={height} />
     </SafeArea.SafeAreaView>
   );
 }
